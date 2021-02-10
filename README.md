@@ -1,70 +1,82 @@
-# Getting Started with Create React App
+## 如何使用react-router自定义confirm
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+使用 React 框架在做后台管理系统的时候经常会遇到编辑页面跳出询问的情况，react-router-dom 提供了 Prompt 组件
 
-## Available Scripts
+```js
+<Prompt when={true} message="Are you sure you want to leave?" />
+```
 
-In the project directory, you can run:
+来解决路由切换的问题，但是默认的实现的方式是利用`window.confirm(message)`弹出浏览器询问框如下
 
-### `yarn start`
+Firfox 浏览器询问
+![firfix](public/firfox.png)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Chrome 浏览器询问
+![chrome](public/chrome.png)
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+显然这种丑陋且不统一的 ui 风格是不能够让产品满意的，他们更希望是类似于 Antd 的`Modal.confirm`的样式风格，所以我们能不能基于 react-router 进行路由拦截定制自己的`Prompt`组件呢？
 
-### `yarn test`
+理论上基于`beforeunload`事件，显然是可以自定义的。带着这个问题我们去查看 react-router 的官方文档，我们可以在每个 Router 组件下面找到这样一个属性：
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- getUserConfirmation: func
+  A function to use to confirm navigation. Defaults to using window.confirm.
 
-### `yarn build`
+意思就是我们可以通过这个属性结合`Prompt`组件实现自定义 confirm
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```jsx
+<HashRouter
+  getUserConfirmation={(message, callback) => {
+    const allowTransition = window.confirm(message);
+    callback(allowTransition);
+  }}
+/>
+```
+getUserConfirmation属性接受一个函数，mesasage和callback作为参数传递，这里官方文档并没有对这个属性做具体介绍，他是由`history`这个库提供的一个api,在路由跳转前执行，mesasage参数只能接受字符串，其值就是来自`Prompt`的message属性值，callback是一个函数，接受一个boolean值，默认当传入参数为true的时候才会执行路由切换。
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+那么我们就可以基于getUserConfirmation 和Prompt 完成自定义的congirm，代码如下
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```jsx
+ <Suspense fallback={"加载中..."}>
+        <HashRouter
+          getUserConfirmation={(result, callback) => {
+            // result是message 执行的结果
+            Modal.confirm({
+              content: result,
+              okText: "确认",
+              cancelText: "取消",
+              onOk: () => callback(true),
+              onCancel: () => callback(false),
+            });
+          }}
+        >
+          <Link to="/">
+            <Button type="primary" style={{ marginRight: 20 }}>
+              Home
+            </Button>
+          </Link>
 
-### `yarn eject`
+          <Link to="/edit">
+            <Button>Edit</Button>
+          </Link>
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+          <Switch>
+            <Route exact path="/">
+              <h2>Home</h2>
+            </Route>
+            <Route path="/edit">
+              <div>
+                <h2>Edit</h2>
+                <Prompt
+                  when={true}
+                  message={(location, action) => {
+                    return "你确定要离开？";
+                  }}
+                />
+              </div>
+            </Route>
+          </Switch>
+        </HashRouter>
+      </Suspense>
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `yarn build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+[git链接](https://github.com/ChrisSong1994/react-router-prompt-test)
